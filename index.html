@@ -1,50 +1,130 @@
-<canvas id="wall" width="600" height="600" style="border:3px solid #888; image-rendering: pixelated;"></canvas>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>PixelWall 200</title>
+  <style>
+    body {
+      background:#111;
+      color:white;
+      font-family:Arial;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:10px;
+      margin-top:20px;
+      user-select:none;
+      touch-action:none; /* ważne na telefonie */
+    }
+    #wall {
+      border:3px solid #888;
+      image-rendering: pixelated;
+      touch-action:none;
+    }
+  </style>
+</head>
+<body>
 
-<script>
-const c = document.getElementById("wall");
-const ctx = c.getContext("2d");
+  <h1>PixelWall 200</h1>
+  <p>Pozostało pikseli: <span id="left">200</span></p>
+  <input type="color" id="color" value="#00e5ff">
+  <canvas id="wall" width="600" height="600"></canvas>
 
-const size = 20; // DUŻE piksele
-let used = Number(localStorage.getItem("pixel_used") || 0);
-const LIMIT = 200;
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-function drawGrid() {
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0,0,c.width,c.height);
+  <script>
+  /* TWÓJ CONFIG */
+  const firebaseConfig = {
+    apiKey: "AIzaSyCJGBWaQGhkQ0rCj_DXsfp5d3cnuH7rk14",
+    authDomain: "pygame-14987.firebaseapp.com",
+    projectId: "pygame-14987",
+    storageBucket: "pygame-14987.firebasestorage.app",
+    messagingSenderId: "186030203687",
+    appId: "1:186030203687:web:e649b7dae014a3a437ff02",
+    measurementId: "G-TGQY3FYPS1",
+    databaseURL: "https://pygame-14987-default-rtdb.europe-west1.firebasedatabase.app"
+  };
 
-  ctx.strokeStyle = "#333"; // jaśniejsza siatka
-  for (let x = 0; x < c.width; x += size) {
-    for (let y = 0; y < c.height; y += size) {
-      ctx.strokeRect(x, y, size, size);
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const c = document.getElementById("wall");
+  const ctx = c.getContext("2d");
+  const size = 20; // DUŻE piksele
+  const colorInput = document.getElementById("color");
+  const leftSpan = document.getElementById("left");
+
+  let used = Number(localStorage.getItem("pixel_used") || 0);
+  const LIMIT = 200;
+  updateLeft();
+
+  function updateLeft() {
+    leftSpan.textContent = Math.max(0, LIMIT - used);
+  }
+
+  /* RYSOWANIE SIATKI */
+  function drawGrid() {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0,0,c.width,c.height);
+
+    ctx.strokeStyle = "#333";
+    for (let x = 0; x < c.width; x += size) {
+      for (let y = 0; y < c.height; y += size) {
+        ctx.strokeRect(x, y, size, size);
+      }
     }
   }
-}
-drawGrid();
-
-// Firebase listener
-db.ref("pixels").on("value", snap => {
-  const data = snap.val() || {};
   drawGrid();
-  Object.keys(data).forEach(key => {
-    const p = data[key];
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, size, size);
+
+  /* ODBIERANIE PIKSELI Z FIREBASE */
+  db.ref("pixels").on("value", snap => {
+    const data = snap.val() || {};
+    drawGrid();
+    Object.keys(data).forEach(key => {
+      const p = data[key];
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, size, size);
+    });
   });
-});
 
-// klik = malowanie
-c.addEventListener("click", e => {
-  if (used >= LIMIT) return alert("Limit 200 pikseli!");
+  /* FUNKCJA MALOWANIA */
+  function paintPixel(x, y) {
+    if (used >= LIMIT) {
+      alert("Wykorzystałeś limit 200 pikseli!");
+      return;
+    }
 
-  const rect = c.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / size) * size;
-  const y = Math.floor((e.clientY - rect.top) / size) * size;
-  const color = document.getElementById("color").value;
+    const color = colorInput.value;
+    const key = `${x}_${y}`;
 
-  const key = `${x}_${y}`;
-  db.ref("pixels/" + key).set({ x, y, color });
+    db.ref("pixels/" + key).set({ x, y, color });
 
-  used++;
-  localStorage.setItem("pixel_used", used);
-});
-</script>
+    used++;
+    localStorage.setItem("pixel_used", used);
+    updateLeft();
+  }
+
+  /* KLIK MYSZKĄ */
+  c.addEventListener("click", e => {
+    const rect = c.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / size) * size;
+    const y = Math.floor((e.clientY - rect.top) / size) * size;
+    paintPixel(x, y);
+  });
+
+  /* DOTYK NA TELEFONIE */
+  c.addEventListener("touchstart", e => {
+    e.preventDefault();
+    const rect = c.getBoundingClientRect();
+    const t = e.touches[0];
+
+    const x = Math.floor((t.clientX - rect.left) / size) * size;
+    const y = Math.floor((t.clientY - rect.top) / size) * size;
+    paintPixel(x, y);
+  });
+  </script>
+
+</body>
+</html>
